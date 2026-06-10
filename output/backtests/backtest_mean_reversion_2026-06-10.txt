@@ -1,0 +1,27 @@
+==============================================================================
+  BACKTEST · Mean Reversion · 2026-06-01 → 2026-06-09 · TEST (simulated, rules only)
+==============================================================================
+  Universe: AAPL, NVDA, TSLA, AMD, META, MSFT, AMZN, GOOGL, NFLX, PLTR, COIN, SOFI
+  Capital $2,000 · risk 1.0%/trade · max 4 positions · stop 1.0×ATR / target 1.8×ATR
+
+  Date        In     Out    Symbol  Sh   Entry     Exit      P&L       Reason
+  --------------------------------------------------------------------------
+  2026-06-05  12:35  12:39  MSFT    1  $ 418.75  $ 419.45  $  +0.70 ✓  target hit
+  2026-06-05  13:40  13:48  NFLX    6  $  81.14  $  81.06  $  -0.48 ✗  stopped out
+  2026-06-08  14:05  14:08  AAPL    1  $ 305.99  $ 304.92  $  -1.07 ✗  stopped out
+  2026-06-09  12:40  12:43  AMD     1  $ 438.71  $ 443.45  $  +4.74 ✓  target hit
+
+  Daily P&L
+    2026-06-01  $   +0.00  
+    2026-06-02  $   +0.00  
+    2026-06-03  $   +0.00  
+    2026-06-04  $   +0.00  
+    2026-06-05  $   +0.22  
+    2026-06-08  $   -1.07  -
+    2026-06-09  $   +4.74  ++++
+
+  Summary
+    Trades 4  ·  2W / 2L  ·  win rate 50%
+    Net P&L $+3.89  ·  return on capital +0.19%
+    Avg win $+2.72  ·  avg loss $-0.78  ·  R:R 3.51  ·  profit factor 3.51
+    Expectancy $+0.97/trade  ·  best AMD $+4.74  ·  worst AAPL $-1.07
