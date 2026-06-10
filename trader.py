@@ -57,7 +57,7 @@ def _resolve_strategy(name: str):
 def cmd_scan(args):
     settings = load_settings()
     cfg = _resolve_strategy(args.strategy)
-    scan(settings, cfg, force=args.force)
+    scan(settings, cfg, force=args.force, verbose=args.verbose)
 
 
 def cmd_run(args):
@@ -66,8 +66,15 @@ def cmd_run(args):
     print(f"Loop every {args.interval}s — Ctrl-C to stop.")
     try:
         while True:
-            scan(settings, cfg, force=args.force)
-            _time.sleep(args.interval)
+            scan(settings, cfg, force=args.force, verbose=args.verbose)
+            remaining = args.interval
+            while remaining > 0:
+                chunk = min(60, remaining)
+                _time.sleep(chunk)
+                remaining -= chunk
+                if remaining > 0:
+                    now = datetime.now(ET)
+                    print(f"  [{now:%H:%M ET}] ♥  next scan in {remaining}s")
     except KeyboardInterrupt:
         print("\nStopped.")
 
@@ -148,6 +155,8 @@ def main():
                         help=f"strategy profile (default: {DEFAULT_STRATEGY})")
         sp.add_argument("--force", action="store_true",
                         help="run even when the market is closed")
+        sp.add_argument("--verbose", "-v", action="store_true",
+                        help="show per-symbol gate failures each cycle")
 
     add_strategy(sub.add_parser("scan", help="run one decision cycle"))
     rp = sub.add_parser("run", help="loop on an interval")

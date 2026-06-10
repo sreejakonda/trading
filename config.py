@@ -138,8 +138,9 @@ STRATEGIES = {
         kind="momentum",
         stop_atr_mult=1.3,
         target_atr_mult=2.4,
-        min_volume_ratio=1.1,
+        min_volume_ratio=0.8,
         min_rs_vs_market=0.0,
+        buy_score=4,
     ),
     "mean_reversion": StrategyConfig(
         name="Mean Reversion",
