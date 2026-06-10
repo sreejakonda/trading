@@ -1,0 +1,199 @@
+# Minimal Statistical Day-Trading System
+
+A small, auditable intraday trading engine. A pure-Python statistics core turns
+live market data into graded, risk-sized signals; an optional Claude pass vetoes
+weak setups; a pluggable broker layer executes them — **simulated by default,
+real Robinhood orders only when you explicitly opt in.**
+
+It is deliberately *minimal*: every decision is traceable to a named, well-known
+statistical pattern, and account-level risk limits are enforced independently of
+the strategy.
+
+> ⚠️ **Not financial advice.** Trading involves real risk of loss. Run in `test`
+> mode until you understand the behaviour, and never trade money you can't lose.
+
+---
+
+## How it works
+
+```
+market_data  →  indicators  →  strategy  →  advisor  →  broker
+ (Yahoo 1m)     (the math)     (signals)   (Claude,    (SIM | Robinhood)
+                                            optional)
+                         engine.py sequences all of it
+                         trader.py is the CLI
+```
+
+| File | Responsibility |
+|------|----------------|
+| `config.py` | All tunables + mode/risk settings (env-overridable) |
+| `market_data.py` | Yahoo Finance intraday bars (verified TLS) |
+| `indicators.py` | Pure statistical functions (VWAP, RSI, Bollinger, ATR, EMA, ORB…) |
+| `strategy.py` | Combines indicators into a graded, ATR-sized `Signal` |
+| `advisor.py` | Optional Claude "is this a trap?" filter |
+| `broker.py` | Execution: `SimBroker` (test) / `RobinhoodBroker` (live) |
+| `state.py` | Open positions + trade ledger, namespaced by mode/strategy |
+| `engine.py` | One decision cycle: data → exits → risk → entries → report |
+| `trader.py` | CLI (`scan`, `run`, `report`, `status`, `doctor`) |
+
+### The statistical patterns
+
+Each is standard, documented, and used as either a **gate** (must pass) or a
+**score** component (0–10):
+
+- **VWAP + bands** — the session's volume-weighted fair value. Holding above
+  VWAP is the institutional trend confirmation; distance in σ measures strength.
+- **EMA(9/21) crossover** — fast-over-slow EMA defines the intraday trend.
+- **RSI(14)** — momentum oscillator. Momentum wants 50–80 (rising, not blown
+  out); mean-reversion wants < 35 (oversold).
+- **Bollinger Bands / z-score** — price's deviation from its rolling mean in
+  standard deviations; the core mean-reversion edge (fade ≥ 2σ stretches).
+- **ATR(14)** — average true range; sizes volatility-adaptive stops and targets.
+- **Opening-Range Breakout** — break of the first 30 minutes' high, a classic
+  intraday momentum trigger.
+- **Relative strength vs SPY** — only buy names leading the market.
+- **Volume ratio** — recent vs session-average volume confirms conviction.
+
+Two strategy profiles ship (`--strategy`):
+
+- **`momentum`** *(default)* — buy strength: above VWAP, EMA uptrend, RSI rising,
+  breaking the opening range, leading the market on rising volume.
+- **`mean_reversion`** — buy weakness: ≥ 2σ below the rolling mean with RSI
+  oversold and a reversal tick; targets reversion to the mean.
+
+### Risk management (enforced regardless of strategy)
+
+- Fixed fractional risk: position size = `risk$ / (entry − stop)`, capped by a
+  max notional per position.
+- Max concurrent positions.
+- **Daily loss kill-switch** — once the day's realized loss hits the limit, no
+  new entries.
+- Time-stop on dead trades, no new entries late in the session, and a hard
+  end-of-day flatten before the close.
+
+---
+
+## Install
+
+Requires Python 3.8+.
+
+```bash
+git clone https://github.com/sreejakonda/trading.git
+cd trading
+./scripts/setup.sh          # installs deps, creates .env, runs a config check
+```
+
+Or manually:
+
+```bash
+python3 -m pip install -r requirements.txt
+cp .env.example .env        # then edit .env
+```
+
+`anthropic` (Claude advisor) and `robin_stocks`/`pyotp` (live trading) are
+optional — test mode needs neither.
+
+---
+
+## Configure
+
+All settings live in `.env` (auto-loaded; no `source` needed). See
+`.env.example` for the full list. The essentials:
+
+```ini
+TRADING_MODE=test           # test | live
+CAPITAL=2000
+RISK_PER_TRADE_PCT=1.0
+MAX_POSITIONS=4
+DAILY_LOSS_LIMIT_PCT=3.0
+STRATEGY=momentum
+# ANTHROPIC_API_KEY=sk-ant-...   # optional Claude advisor
+```
+
+Check what the system sees at any time:
+
+```bash
+python3 trader.py doctor
+```
+
+---
+
+## Run
+
+```bash
+python3 trader.py scan                      # one cycle, default strategy
+python3 trader.py scan --strategy mean_reversion
+python3 trader.py scan --force              # run even when the market is closed
+python3 trader.py run --interval 300        # loop every 5 min while open
+python3 trader.py status                    # open positions
+python3 trader.py report                    # win rate, expectancy, R:R, P&L
+```
+
+### Scheduling (cron)
+
+`scripts/run.sh` is a cron-friendly wrapper. Example — every 5 minutes on
+weekdays during US market hours (EST; shift one hour for daylight saving):
+
+```cron
+*/5 13-20 * * 1-5  /full/path/to/trading/scripts/run.sh >> /full/path/to/trading/scan.log 2>&1
+```
+
+---
+
+## Switching from test mode to live mode
+
+**Test mode is the default and risks no money** — it places simulated fills
+(with modelled slippage) against live market data, so you can validate the
+strategy and your P&L expectations first.
+
+Robinhood has **no paper-trading API**, so going live means *real orders on a
+real account*. Three independent guards must all be satisfied:
+
+1. **`TRADING_MODE=live`** — selects the Robinhood broker.
+2. **`LIVE_CONFIRM=yes`** — without this, live orders are *refused* even in live
+   mode (the engine raises rather than trade).
+3. **Robinhood credentials** present in `.env`.
+
+Step by step:
+
+```ini
+# .env
+TRADING_MODE=live
+LIVE_CONFIRM=yes
+ROBINHOOD_USERNAME=you@example.com
+ROBINHOOD_PASSWORD=your-password
+ROBINHOOD_TOTP=YOURBASE32MFASECRET   # required for unattended/cron runs
+```
+
+Then install the live dependencies and confirm:
+
+```bash
+python3 -m pip install robin_stocks pyotp
+python3 trader.py doctor      # should show mode=live, creds present, confirmed
+```
+
+**Recommended first step into live: dry run.** Set `DRY_RUN=true` to run the
+*entire* live pipeline (real data, real risk checks, real decisions) while
+sending **no** orders — they're logged as `LIVE-DRYRUN` fills instead. When the
+log looks right, set `DRY_RUN=false`.
+
+To go back to safety at any time, set `TRADING_MODE=test` (or `LIVE_CONFIRM=no`).
+
+> Test and live keep **separate** position/trade state under `state/`, so they
+> never mix.
+
+### Using a Robinhood MCP server / a different broker instead
+
+Execution is isolated behind the `Broker` interface in `broker.py` (`buy`,
+`sell`, `account_equity`). To route live orders through a Robinhood MCP server,
+Interactive Brokers, Alpaca, etc., add one `Broker` subclass and return it from
+`make_broker()` — no strategy, risk, or engine code changes.
+
+---
+
+## State & data
+
+- `state/positions_<mode>_<strategy>.json` — open positions
+- `state/trades_<mode>_<strategy>.jsonl` — completed-trade ledger
+
+Both are git-ignored. Delete them to reset a book.

@@ -1,0 +1,10 @@
+# Core (required for test mode)
+pytz>=2023.3
+certifi>=2023.7.22   # verified TLS CA bundle (fixes macOS cert errors)
+
+# Optional — Claude second-opinion advisor (skipped if ANTHROPIC_API_KEY unset)
+anthropic>=0.39.0
+
+# Optional — live trading on Robinhood (only needed for TRADING_MODE=live)
+robin_stocks>=3.0.0
+pyotp>=2.9.0
