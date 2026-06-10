@@ -234,6 +234,33 @@ Robinhood official Agentic MCP — lives in the sibling repo
 
 ---
 
+## Quick reference
+
+```
+# ── Daily workflow ──────────────────────────────────────────────────────────
+python3 trader.py run --interval 300       # start the loop (prints every 5 min)
+python3 trader.py run --interval 60        # faster loop — 1 min cycles
+python3 trader.py scan                     # fire one cycle and exit
+python3 trader.py scan --force             # one cycle even when market is closed
+python3 trader.py scan --strategy mean_reversion  # use the mean-reversion profile
+
+# ── What's happening ────────────────────────────────────────────────────────
+python3 trader.py status                   # open positions, stops, targets
+python3 trader.py report                   # win rate, R:R, P&L, last 5 trades
+python3 trader.py doctor                   # config, mode, API key check
+
+# ── Research ────────────────────────────────────────────────────────────────
+python3 trader.py backtest                 # replay past ~7 days, show blotter
+python3 trader.py backtest --strategy mean_reversion
+python3 trader.py backtest --days 5        # shorter window
+```
+
+The loop prints a timestamped block every cycle — header, market %, signals found
+(or "No entry signals"), any exits, and a running P&L snapshot. A quiet cycle still
+prints so you always know it's alive.
+
+---
+
 ## Output layout
 
 All generated files live under `output/` in a predictable, git-tracked tree:
