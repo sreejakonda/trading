@@ -1,0 +1,21 @@
+# Secrets — never commit
+.env
+
+# Runtime state — changes every run
+positions.json
+positions_aggressive.json
+positions_cautious.json
+signals.log
+
+# Trade history — keep locally, don't expose
+trades_aggressive.jsonl
+trades_cautious.jsonl
+
+# Logs — too noisy for git
+aggressive.txt
+cautious.txt
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
