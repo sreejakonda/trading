@@ -213,14 +213,22 @@ To go back to safety at any time, set `TRADING_MODE=test` (or `LIVE_CONFIRM=no`)
 
 > Test and live keep **separate** state under `output/`, so they never mix.
 
-### Using a Robinhood MCP server / a different broker instead
+### Autonomous vs. agentic — and the Robinhood MCP
 
-Live execution currently uses the `robin_stocks` library directly — there is no
-bundled Robinhood MCP connector. Execution is isolated behind the `Broker`
-interface in `broker.py` (`buy`, `sell`, `account_equity`), so if you run a
-Robinhood MCP server (or want Interactive Brokers, Alpaca, …), add one `Broker`
-subclass that calls it and return it from `make_broker()` — no strategy, risk,
-or engine code changes.
+This repo is the **autonomous** engine: a standalone program that executes
+through a broker **API** (currently `robin_stocks`), suitable for unattended/cron
+runs. A standalone program **cannot** call MCP tools — those are only callable by
+a Claude agent — so Robinhood's official Agentic **MCP** does not belong here.
+
+That human-in-the-loop, MCP-based model lives in the sibling repo
+[`../agentic_trading`](../agentic_trading): a Claude agent analyses, proposes
+sized orders, and **you approve** each one.
+
+For *this* autonomous repo, execution is isolated behind the `Broker` interface
+in `broker.py` (`buy`, `sell`, `account_equity`). To use a broker with an
+official API (Alpaca is the usual reliable choice — official REST + real paper
+trading), add one `Broker` subclass and return it from `make_broker()` — no
+strategy, risk, or engine code changes.
 
 ---
 
