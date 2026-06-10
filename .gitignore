@@ -1,12 +1,2 @@
 # Secrets — never commit
 .env
-
-# Runtime state (positions + trade ledgers, namespaced by mode/strategy)
-state/
-
-# Python
-__pycache__/
-*.pyc
-*.pyo
-.venv/
-venv/
