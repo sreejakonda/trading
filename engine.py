@@ -11,6 +11,7 @@ hours.
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, time
 from typing import List, Optional
 
@@ -18,7 +19,7 @@ import advisor
 import state
 import strategy
 from broker import Broker, make_broker
-from config import ET, RiskConfig, Settings, StrategyConfig
+from config import ET, LOGS_DIR, RiskConfig, Settings, StrategyConfig
 from market_data import Series, fetch_series
 
 MARKET_OPEN, MARKET_CLOSE = time(9, 30), time(16, 0)
@@ -191,4 +192,13 @@ def scan(settings: Settings, cfg: StrategyConfig, force: bool = False) -> List[s
         today = state.realized_pnl_today(settings.mode, cfg.kind, now.strftime("%Y-%m-%d"))
         emit(f"  P&L today ${today:+.2f}  ·  all-time {s['n']} trades, "
              f"{s['win_rate']:.0f}% win, net ${s['net']:+.2f}, PF {s['profit_factor']}")
+
+    _write_log(settings.mode, now, out)
     return out
+
+
+def _write_log(mode: str, now: datetime, lines: List[str]) -> None:
+    os.makedirs(LOGS_DIR, exist_ok=True)
+    path = os.path.join(LOGS_DIR, f"scan_{mode}_{now:%Y-%m-%d}.log")
+    with open(path, "a") as f:
+        f.write("\n".join(lines) + "\n")

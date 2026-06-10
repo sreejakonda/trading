@@ -13,19 +13,15 @@ import os
 from datetime import datetime
 from typing import Dict, List
 
-from config import ET, STATE_DIR
-
-
-def _ensure_dir():
-    os.makedirs(STATE_DIR, exist_ok=True)
+from config import ET, POSITIONS_DIR, TRADES_DIR
 
 
 def _positions_path(mode: str, strategy: str) -> str:
-    return os.path.join(STATE_DIR, f"positions_{mode}_{strategy}.json")
+    return os.path.join(POSITIONS_DIR, f"positions_{mode}_{strategy}.json")
 
 
 def _trades_path(mode: str, strategy: str) -> str:
-    return os.path.join(STATE_DIR, f"trades_{mode}_{strategy}.jsonl")
+    return os.path.join(TRADES_DIR, f"trades_{mode}_{strategy}.jsonl")
 
 
 def load_positions(mode: str, strategy: str) -> Dict[str, dict]:
@@ -40,14 +36,14 @@ def load_positions(mode: str, strategy: str) -> Dict[str, dict]:
 
 
 def save_positions(mode: str, strategy: str, positions: Dict[str, dict]) -> None:
-    _ensure_dir()
+    os.makedirs(POSITIONS_DIR, exist_ok=True)
     with open(_positions_path(mode, strategy), "w") as f:
         json.dump(positions, f, indent=2)
 
 
 def log_trade(mode: str, strategy: str, pos: dict, exit_price: float, reason: str) -> dict:
     """Append a closed trade to the ledger and return the record (with P&L)."""
-    _ensure_dir()
+    os.makedirs(TRADES_DIR, exist_ok=True)
     entry, shares = pos["entry_price"], pos["shares"]
     pnl = round((exit_price - entry) * shares, 2)
     pnl_pct = round((exit_price - entry) / entry * 100, 3) if entry else 0.0

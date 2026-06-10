@@ -127,7 +127,32 @@ python3 trader.py scan --force              # run even when the market is closed
 python3 trader.py run --interval 300        # loop every 5 min while open
 python3 trader.py status                    # open positions
 python3 trader.py report                    # win rate, expectancy, R:R, P&L
+python3 trader.py backtest                  # replay the past week (see below)
 ```
+
+### Backtesting
+
+Replay the strategy over the last few days of 1-minute history and print a clean
+trade blotter plus P&L — same rules and risk limits as live, no look-ahead, and
+the Claude advisor disabled so the result reflects the mechanical edge:
+
+```bash
+python3 trader.py backtest                          # default strategy, ~1 week
+python3 trader.py backtest --strategy mean_reversion --days 5
+```
+
+```
+  Date        In     Out    Symbol  Sh   Entry     Exit      P&L       Reason
+  --------------------------------------------------------------------------
+  2026-06-03  10:05  10:10  TSLA    1  $ 425.57  $ 429.15  $  +3.58 ✓  target hit
+  ...
+  Summary
+    Trades 26  ·  10W / 16L  ·  win rate 38%
+    Net P&L $+2.26  ·  return on capital +0.11%  ·  R:R 1.86  ·  profit factor 1.16
+```
+
+Reports are also written to `output/backtests/`. Yahoo serves at most ~7 trading
+days of 1-minute bars, so that is the backtest's reach.
 
 ### Scheduling (cron)
 
@@ -179,21 +204,31 @@ log looks right, set `DRY_RUN=false`.
 
 To go back to safety at any time, set `TRADING_MODE=test` (or `LIVE_CONFIRM=no`).
 
-> Test and live keep **separate** position/trade state under `state/`, so they
-> never mix.
+> Test and live keep **separate** state under `output/`, so they never mix.
 
 ### Using a Robinhood MCP server / a different broker instead
 
-Execution is isolated behind the `Broker` interface in `broker.py` (`buy`,
-`sell`, `account_equity`). To route live orders through a Robinhood MCP server,
-Interactive Brokers, Alpaca, etc., add one `Broker` subclass and return it from
-`make_broker()` — no strategy, risk, or engine code changes.
+Live execution currently uses the `robin_stocks` library directly — there is no
+bundled Robinhood MCP connector. Execution is isolated behind the `Broker`
+interface in `broker.py` (`buy`, `sell`, `account_equity`), so if you run a
+Robinhood MCP server (or want Interactive Brokers, Alpaca, …), add one `Broker`
+subclass that calls it and return it from `make_broker()` — no strategy, risk,
+or engine code changes.
 
 ---
 
-## State & data
+## Output layout
 
-- `state/positions_<mode>_<strategy>.json` — open positions
-- `state/trades_<mode>_<strategy>.jsonl` — completed-trade ledger
+All generated files live under `output/` in a predictable, git-tracked tree:
 
-Both are git-ignored. Delete them to reset a book.
+```
+output/
+├── positions/   positions_<mode>_<strategy>.json   open positions
+├── trades/      trades_<mode>_<strategy>.jsonl     closed-trade ledger
+├── logs/        scan_<mode>_<date>.log             one line-per-cycle run log
+└── backtests/   backtest_<strategy>_<date>.txt     saved backtest reports
+```
+
+Everything is namespaced by **mode** and **strategy**, so `test` and `live`
+books — and `momentum` vs `mean_reversion` — never collide. Delete a file to
+reset that book. Only `.env` is git-ignored.

@@ -15,8 +15,17 @@ from datetime import time
 import pytz
 
 # ── paths ───────────────────────────────────────────────────────────────────
+# All generated files live under output/ in a predictable, git-tracked tree:
+#   output/positions/  open positions   (positions_<mode>_<strategy>.json)
+#   output/trades/     closed-trade log  (trades_<mode>_<strategy>.jsonl)
+#   output/logs/       per-day scan logs (scan_<mode>_<date>.log)
+#   output/backtests/  backtest reports  (backtest_<strategy>_<date>.txt)
 ROOT = os.path.dirname(os.path.abspath(__file__))
-STATE_DIR = os.path.join(ROOT, "state")
+OUTPUT_DIR = os.path.join(ROOT, "output")
+POSITIONS_DIR = os.path.join(OUTPUT_DIR, "positions")
+TRADES_DIR = os.path.join(OUTPUT_DIR, "trades")
+LOGS_DIR = os.path.join(OUTPUT_DIR, "logs")
+BACKTESTS_DIR = os.path.join(OUTPUT_DIR, "backtests")
 ET = pytz.timezone("America/New_York")
 
 

@@ -5,6 +5,8 @@ Command-line entry point.
     python3 trader.py scan                 one decision cycle (default strategy)
     python3 trader.py scan --strategy mean_reversion
     python3 trader.py run --interval 300    loop every 5 min during market hours
+    python3 trader.py backtest              replay the past week, show P&L
+    python3 trader.py backtest --strategy mean_reversion --days 5
     python3 trader.py report                performance across strategies
     python3 trader.py status                open positions and account
     python3 trader.py doctor                check config / mode / credentials
@@ -70,6 +72,14 @@ def cmd_run(args):
             _time.sleep(args.interval)
     except KeyboardInterrupt:
         print("\nStopped.")
+
+
+def cmd_backtest(args):
+    import backtest
+    settings = load_settings()
+    cfg = _resolve_strategy(args.strategy)
+    _trades, report = backtest.run(settings, cfg, days=args.days)
+    print(report)
 
 
 def cmd_report(args):
@@ -146,13 +156,17 @@ def main():
     rp = sub.add_parser("run", help="loop on an interval")
     add_strategy(rp)
     rp.add_argument("--interval", type=int, default=300, help="seconds between cycles")
+    bp = sub.add_parser("backtest", help="replay recent history and report P&L")
+    bp.add_argument("--strategy", default=DEFAULT_STRATEGY,
+                    help=f"strategy profile (default: {DEFAULT_STRATEGY})")
+    bp.add_argument("--days", type=int, default=7, help="trading days to replay (max 7)")
     sub.add_parser("report", help="performance report")
     sub.add_parser("status", help="open positions")
     sub.add_parser("doctor", help="check configuration and credentials")
 
     args = p.parse_args()
-    {"scan": cmd_scan, "run": cmd_run, "report": cmd_report,
-     "status": cmd_status, "doctor": cmd_doctor}[args.cmd](args)
+    {"scan": cmd_scan, "run": cmd_run, "backtest": cmd_backtest,
+     "report": cmd_report, "status": cmd_status, "doctor": cmd_doctor}[args.cmd](args)
 
 
 if __name__ == "__main__":
