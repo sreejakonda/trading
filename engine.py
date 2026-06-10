@@ -82,7 +82,7 @@ def _kill_switch_tripped(settings, cfg, now) -> bool:
     return realized <= -settings.risk.daily_loss_limit_dollars
 
 
-def scan(settings: Settings, cfg: StrategyConfig, force: bool = False) -> List[str]:
+def scan(settings: Settings, cfg: StrategyConfig, force: bool = False, verbose: bool = False) -> List[str]:
     """Run one decision cycle. Returns the lines it printed (handy for logging)."""
     out: List[str] = []
 
@@ -138,6 +138,7 @@ def scan(settings: Settings, cfg: StrategyConfig, force: bool = False) -> List[s
     else:
         candidates = []
         watch = []
+        skipped = []
         for sym in settings.watchlist:
             if sym in positions or sym not in data:
                 continue
@@ -145,11 +146,19 @@ def scan(settings: Settings, cfg: StrategyConfig, force: bool = False) -> List[s
             if sig.action in (strategy.BUY, strategy.STRONG_BUY):
                 candidates.append(sig)
             elif sig.action == strategy.WATCH:
-                watch.append(f"{sym}[{sig.score}]")
+                watch.append(sig)
+            else:
+                skipped.append(sig)
         candidates.sort(key=lambda s: s.score, reverse=True)
 
-        if watch:
-            emit("  Watch: " + ", ".join(watch))
+        if verbose:
+            for sig in skipped:
+                emit(f"  {'skip':<6} {sig.symbol:<5}  {'; '.join(sig.reasons)}")
+            for sig in watch:
+                emit(f"  {'watch':<6} {sig.symbol:<5} [{sig.score}/10]  {'; '.join(sig.reasons)}")
+        elif watch:
+            emit("  Watch: " + ", ".join(f"{s.symbol}[{s.score}]" for s in watch))
+
         if not candidates:
             emit("  No entry signals this cycle.")
         else:

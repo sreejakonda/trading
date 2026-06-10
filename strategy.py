@@ -123,20 +123,20 @@ def _size(price: float, stop: float, risk: RiskConfig) -> int:
 def _momentum(f: Features, cfg: StrategyConfig) -> Signal:
     sig = Signal(symbol=f.symbol, action=SKIP, score=0, price=f.price)
 
-    # Hard gates — any failure means no trade.
+    # Hard gates — collect all failures so verbose mode can report them.
     gates = [
         (f.above_vwap, "below VWAP"),
         (f.ema_fast is not None and f.ema_slow is not None and f.ema_fast > f.ema_slow,
          "no EMA uptrend"),
         (f.pct_from_open > 0, "red on day"),
-        (f.rsi is not None and 50 <= f.rsi <= 80, "RSI not in 50–80"),
+        (f.rsi is not None and 45 <= f.rsi <= 85, "RSI not in 45–85"),
         (f.volume_ratio >= cfg.min_volume_ratio, "thin volume"),
         (f.rs_vs_market >= cfg.min_rs_vs_market, "lagging market"),
     ]
-    for ok, why in gates:
-        if not ok:
-            sig.reasons.append(why)
-            return sig
+    failed = [why for ok, why in gates if not ok]
+    if failed:
+        sig.reasons = failed
+        return sig
 
     # Score 0..10.
     score = 0.0
@@ -170,10 +170,10 @@ def _mean_reversion(f: Features, cfg: StrategyConfig) -> Signal:
         (f.reversal_tick, "still falling"),
         (f.volume_ratio >= cfg.min_volume_ratio, "thin volume"),
     ]
-    for ok, why in gates:
-        if not ok:
-            sig.reasons.append(why)
-            return sig
+    failed = [why for ok, why in gates if not ok]
+    if failed:
+        sig.reasons = failed
+        return sig
 
     score = 0.0
     score += min(3.5, abs(f.bb_z))                                      # how stretched
