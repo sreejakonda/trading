@@ -18,7 +18,7 @@ the strategy.
 
 ```
 market_data  →  indicators  →  strategy  →  advisor  →  broker
- (Yahoo 1m)     (the math)     (signals)   (Claude,    (SIM | Robinhood)
+ (Yahoo 1m)     (the math)     (signals)   (Claude,    (SIM | plug in real broker)
                                             optional)
                          engine.py sequences all of it
                          trader.py is the CLI
@@ -31,7 +31,7 @@ market_data  →  indicators  →  strategy  →  advisor  →  broker
 | `indicators.py` | Pure statistical functions (VWAP, RSI, Bollinger, ATR, EMA, ORB…) |
 | `strategy.py` | Combines indicators into a graded, ATR-sized `Signal` |
 | `advisor.py` | Optional Claude "is this a trap?" filter |
-| `broker.py` | Execution: `SimBroker` (test) / `RobinhoodBroker` (live) |
+| `broker.py` | Execution: `SimBroker` (default) — extend to add a real broker |
 | `state.py` | Open positions + trade ledger, namespaced by mode/strategy |
 | `engine.py` | One decision cycle: data → exits → risk → entries → report |
 | `trader.py` | CLI (`scan`, `run`, `report`, `status`, `doctor`) |
@@ -121,13 +121,13 @@ python3 trader.py doctor
 ## Run
 
 ```bash
-python3 trader.py scan                      # one cycle, default strategy
+python3 trader.py scan                           # one cycle, default strategy
 python3 trader.py scan --strategy mean_reversion
-python3 trader.py scan --force              # run even when the market is closed
-python3 trader.py run --interval 300        # loop every 5 min while open
-python3 trader.py status                    # open positions
-python3 trader.py report                    # win rate, expectancy, R:R, P&L
-python3 trader.py backtest                  # replay the past week (see below)
+python3 trader.py scan --force                   # run even when market is closed
+python3 trader.py run --interval 300             # loop every 5 min while open
+python3 trader.py status                         # open positions
+python3 trader.py report                         # win rate, expectancy, R:R, P&L
+python3 trader.py backtest                       # replay the past week (see below)
 ```
 
 ### Backtesting
@@ -165,70 +165,72 @@ weekdays during US market hours (EST; shift one hour for daylight saving):
 
 ---
 
-## Switching from test mode to live mode
+## Going live with Alpaca
 
-**Test mode is the default and risks no money** — it places simulated fills
-(with modelled slippage) against live market data, so you can validate the
-strategy and your P&L expectations first.
+**Test mode is the default** — it runs the full decision loop against live
+market data and simulates fills with modelled slippage. No account, no money at
+risk. When the strategy's behaviour looks right, step up through paper and live.
 
-Robinhood has **no paper-trading API**, so going live means *real orders on a
-real account*. Three independent guards must all be satisfied:
+### Three modes
 
-1. **`TRADING_MODE=live`** — selects the Robinhood broker.
-2. **`LIVE_CONFIRM=yes`** — without this, live orders are *refused* even in live
-   mode (the engine raises rather than trade).
-3. **Robinhood credentials** present in `.env`.
+| `TRADING_MODE` | Broker | Money at risk |
+|---|---|---|
+| `test` | `SimBroker` | No — simulated fills |
+| `paper` | Alpaca paper API | No — real infrastructure, fake money |
+| `live` | Alpaca live API | **Yes — real orders** |
 
-Step by step:
+### 1. Get Alpaca credentials
 
-```ini
-# .env
-TRADING_MODE=live
-LIVE_CONFIRM=yes
-ROBINHOOD_USERNAME=you@example.com
-ROBINHOOD_PASSWORD=your-password
-ROBINHOOD_TOTP=YOURBASE32MFASECRET   # required for unattended/cron runs
-```
+Create a free account at [alpaca.markets](https://alpaca.markets). Under
+**API Keys**, generate a key pair. The same key works for both paper and live
+endpoints.
 
-Then install the live dependencies, log in once, and confirm:
+### 2. Install and configure
 
 ```bash
-python3 -m pip install robin_stocks pyotp
-python3 trader.py login       # interactive: you type your own credentials/MFA
-python3 trader.py doctor      # should show mode=live, creds present, confirmed
+python3 -m pip install 'alpaca-py>=0.8.2'
 ```
 
-`login` prompts for your username, password, and MFA via `getpass` and hands
-them straight to Robinhood; nothing is logged or stored by this tool except the
-session token Robinhood itself caches (`~/.tokens/robinhood.pickle`), which lets
-later runs skip the prompt. For unattended/cron use, set `ROBINHOOD_TOTP` so a
-fresh MFA code can be generated automatically.
+In `.env`:
 
-**Recommended first step into live: dry run.** Set `DRY_RUN=true` to run the
-*entire* live pipeline (real data, real risk checks, real decisions) while
-sending **no** orders — they're logged as `LIVE-DRYRUN` fills instead. When the
-log looks right, set `DRY_RUN=false`.
+```ini
+TRADING_MODE=paper          # start here
+ALPACA_API_KEY=PKxxxxxxxxxxxxxxxxxx
+ALPACA_SECRET_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
 
-To go back to safety at any time, set `TRADING_MODE=test` (or `LIVE_CONFIRM=no`).
+Verify:
 
-> Test and live keep **separate** state under `output/`, so they never mix.
+```bash
+python3 trader.py doctor    # should show mode=paper, keys present
+python3 trader.py scan --force   # fires a cycle (force past market-hours check)
+```
 
-### Autonomous vs. agentic — and the Robinhood MCP
+### 3. Go live
 
-This repo is the **autonomous** engine: a standalone program that executes
-through a broker **API** (currently `robin_stocks`), suitable for unattended/cron
-runs. A standalone program **cannot** call MCP tools — those are only callable by
-a Claude agent — so Robinhood's official Agentic **MCP** does not belong here.
+Two guards must both be set:
 
-That human-in-the-loop, MCP-based model lives in the sibling repo
-[`../agentic_trading`](../agentic_trading): a Claude agent analyses, proposes
-sized orders, and **you approve** each one.
+```ini
+TRADING_MODE=live
+LIVE_CONFIRM=yes            # explicit opt-in; orders refused without this
+```
 
-For *this* autonomous repo, execution is isolated behind the `Broker` interface
-in `broker.py` (`buy`, `sell`, `account_equity`). To use a broker with an
-official API (Alpaca is the usual reliable choice — official REST + real paper
-trading), add one `Broker` subclass and return it from `make_broker()` — no
-strategy, risk, or engine code changes.
+Paper and live keep **separate** state under `output/` and never mix.
+
+### Adding a different broker
+
+`broker.py` exposes a `Broker` ABC (`buy`, `sell`, `account_equity`). Add one
+subclass and return it from `make_broker()` — nothing upstream changes.
+
+---
+
+## Autonomous vs. agentic
+
+This repo is the **autonomous** engine: a standalone Python program suitable for
+unattended cron runs that executes through a broker API. The human-in-the-loop
+model — where a Claude agent proposes orders and **you approve each one** via the
+Robinhood official Agentic MCP — lives in the sibling repo
+[`../agentic_trading`](../agentic_trading).
 
 ---
 

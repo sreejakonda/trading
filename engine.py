@@ -98,9 +98,8 @@ def scan(settings: Settings, cfg: StrategyConfig, force: bool = False) -> List[s
         return out
 
     broker: Broker = make_broker(settings)
-    tag = "DRY-RUN" if settings.dry_run else broker.label
     emit("=" * 60)
-    emit(f"  {cfg.name}  ·  {settings.mode.upper()} ({tag})  ·  {stamp}")
+    emit(f"  {cfg.name}  ·  {settings.mode.upper()} ({broker.label})  ·  {stamp}")
     emit("=" * 60)
 
     data = fetch_series(list(settings.watchlist) + [settings.benchmark],

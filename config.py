@@ -44,13 +44,12 @@ def _env_int(name: str, default: int) -> int:
 
 
 # ── trading mode ────────────────────────────────────────────────────────────
-# "test" → SimBroker: live market data, simulated fills, no money at risk.
-# "live" → RobinhoodBroker: REAL orders against a real Robinhood account.
+# test  → SimBroker: live data, simulated fills, no account needed.
+# paper → AlpacaBroker(paper=True): Alpaca paper trading (real fills, fake money).
+# live  → AlpacaBroker(paper=False): real money. Requires LIVE_CONFIRM=yes.
 MODE = os.environ.get("TRADING_MODE", "test").strip().lower()
-# Extra belt-and-suspenders gate: live orders are refused unless this is "yes".
+# Belt-and-suspenders guard: live orders refused unless explicitly set to "yes".
 LIVE_CONFIRM = os.environ.get("LIVE_CONFIRM", "no").strip().lower() == "yes"
-# When true, the engine logs the orders it *would* place but never sends them.
-DRY_RUN = os.environ.get("DRY_RUN", "false").strip().lower() in ("1", "true", "yes")
 
 
 # ── universe ────────────────────────────────────────────────────────────────
@@ -158,7 +157,6 @@ DEFAULT_STRATEGY = os.environ.get("STRATEGY", "momentum").strip().lower()
 @dataclass(frozen=True)
 class Settings:
     mode: str = MODE
-    dry_run: bool = DRY_RUN
     live_confirmed: bool = LIVE_CONFIRM
     risk: RiskConfig = field(default_factory=RiskConfig)
     watchlist: tuple = field(default_factory=lambda: tuple(WATCHLIST))
@@ -169,6 +167,10 @@ class Settings:
     @property
     def is_live(self) -> bool:
         return self.mode == "live"
+
+    @property
+    def is_paper(self) -> bool:
+        return self.mode == "paper"
 
 
 def load_settings() -> Settings:
