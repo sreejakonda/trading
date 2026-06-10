@@ -9,6 +9,7 @@ Command-line entry point.
     python3 trader.py backtest --strategy mean_reversion --days 5
     python3 trader.py report                performance across strategies
     python3 trader.py status                open positions and account
+    python3 trader.py login                 interactive Robinhood login (you type creds)
     python3 trader.py doctor                check config / mode / credentials
 
 Mode is controlled by the environment (TRADING_MODE=test|live); see README.
@@ -122,6 +123,40 @@ def cmd_status(args):
                   f"stop ${p['stop']}  target ${p['target']}  (since {p['entry_time']})")
 
 
+def cmd_login(args):
+    """
+    Interactive Robinhood login — YOU type your credentials here in your own
+    terminal; they are read via getpass and handed straight to robin_stocks,
+    which stores a reusable session token (~/.tokens/robinhood.pickle). After a
+    successful login, live mode reuses that token without prompting again.
+    """
+    import getpass
+    try:
+        import robin_stocks.robinhood as rh
+    except ImportError:
+        sys.exit("Live deps missing. Install first:  python3 -m pip install robin_stocks pyotp")
+
+    print("Robinhood login (credentials are entered by you and never logged).")
+    username = input("  Username/email: ").strip()
+    password = getpass.getpass("  Password: ")
+    mfa = getpass.getpass("  MFA code (blank if none): ").strip() or None
+
+    try:
+        rh.login(username=username, password=password, mfa_code=mfa,
+                 store_session=True)
+    except Exception as e:
+        sys.exit(f"Login failed: {e}")
+
+    try:
+        prof = rh.profiles.load_portfolio_profile() or {}
+        equity = prof.get("equity") or prof.get("extended_hours_equity")
+        print(f"✓ Logged in. Session token stored. Account equity: ${float(equity):,.2f}"
+              if equity else "✓ Logged in. Session token stored.")
+    except Exception:
+        print("✓ Logged in. Session token stored.")
+    print("You can now run live mode (TRADING_MODE=live, LIVE_CONFIRM=yes).")
+
+
 def cmd_doctor(args):
     settings = load_settings()
     print(f"Trading mode      : {settings.mode}")
@@ -162,11 +197,13 @@ def main():
     bp.add_argument("--days", type=int, default=7, help="trading days to replay (max 7)")
     sub.add_parser("report", help="performance report")
     sub.add_parser("status", help="open positions")
+    sub.add_parser("login", help="interactive Robinhood login (you enter creds)")
     sub.add_parser("doctor", help="check configuration and credentials")
 
     args = p.parse_args()
     {"scan": cmd_scan, "run": cmd_run, "backtest": cmd_backtest,
-     "report": cmd_report, "status": cmd_status, "doctor": cmd_doctor}[args.cmd](args)
+     "report": cmd_report, "status": cmd_status, "login": cmd_login,
+     "doctor": cmd_doctor}[args.cmd](args)
 
 
 if __name__ == "__main__":

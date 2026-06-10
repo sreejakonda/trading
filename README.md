@@ -190,12 +190,19 @@ ROBINHOOD_PASSWORD=your-password
 ROBINHOOD_TOTP=YOURBASE32MFASECRET   # required for unattended/cron runs
 ```
 
-Then install the live dependencies and confirm:
+Then install the live dependencies, log in once, and confirm:
 
 ```bash
 python3 -m pip install robin_stocks pyotp
+python3 trader.py login       # interactive: you type your own credentials/MFA
 python3 trader.py doctor      # should show mode=live, creds present, confirmed
 ```
+
+`login` prompts for your username, password, and MFA via `getpass` and hands
+them straight to Robinhood; nothing is logged or stored by this tool except the
+session token Robinhood itself caches (`~/.tokens/robinhood.pickle`), which lets
+later runs skip the prompt. For unattended/cron use, set `ROBINHOOD_TOTP` so a
+fresh MFA code can be generated automatically.
 
 **Recommended first step into live: dry run.** Set `DRY_RUN=true` to run the
 *entire* live pipeline (real data, real risk checks, real decisions) while
